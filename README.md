@@ -4,11 +4,11 @@ Web estática para GitHub Pages. Todo corre en el navegador: Firebase por CDN y 
 
 ## Archivos
 
-- `index.html`, `styles.css`, `main.js`: página pública con el menú del día (flechas para cambiar de día, `?fecha=AAAA-MM-DD` para enlazar uno).
+- `index.html`, `styles.css`, `main.js`: página pública con el plato del día, el postre (siempre el mismo) y el precio del menú con pan (flechas para cambiar de día, `?fecha=AAAA-MM-DD` para enlazar uno).
 - `login.html` + `login.js`: login como el de `join.html` (Google o Microsoft, con ventana emergente), pero sin escribir en `tempusers`. Si el correo está en `canteen`, lleva a la gestión.
-- `gestion.html` + `gestion.js`: foto del menú con OCR y edición manual. Sin sesión autorizada vuelve a `login.html`.
-- `ocr-parser.js`: lee la hoja semanal "PLATO DEL DÍA". Localiza las columnas LUNES a VIERNES, lee solo la celda del día de la fecha elegida y coge la línea "Postre: ...". Las notas (por ejemplo el precio) se escriben a mano.
-- `firebase-config.js`: la misma config pública de `arise-a3be8` que usa `join.html`.
+- `gestion.html` + `gestion.js`: se edita la semana entera (lunes a viernes) a mano o con la foto de la hoja semanal, y se guarda de una vez. El precio viene puesto (5,10 €) y se puede cambiar. Sin sesión autorizada vuelve a `login.html`.
+- `ocr-parser.js`: lee la hoja semanal "PLATO DEL DÍA". Saca la semana de la cabecera ("DEL 12 AL 16 DE OCTUBRE"), localiza las columnas LUNES a VIERNES y lee cada celda por separado.
+- `firebase-config.js`: la misma config pública de `arise-a3be8` que usa `join.html`, el postre fijo y el precio por defecto.
 
 La foto no se sube a ningún sitio: se procesa en el navegador y solo se guarda el texto del menú.
 
@@ -21,14 +21,13 @@ canteen/
   persona@ejemplo.com   { nombre: "Persona" }
 ```
 
-**Menús** (los crea la app): colección `canteen_menus`, un documento por día con ID `AAAA-MM-DD`.
+**Menús** (los crea la app): colección `canteen_menus`, un documento por día con ID `AAAA-MM-DD`. El postre no se guarda porque es siempre el mismo.
 
 ```
-canteen_menus/2026-10-15 {
-  fecha: "2026-10-15",
-  primeros: ["Albóndigas en salsa con patatas"],   // plato del día
-  postres: ["Pieza de fruta, yogur, lácteos, tarta del día o café"],
-  notas: "PLATO DEL DÍA, PAN Y POSTRE 5,10€ (I.V.A incluido)",
+canteen_menus/2026-10-14 {
+  fecha: "2026-10-14",
+  plato: "Albóndigas en salsa con patatas",   // o "Festivo"
+  precio: "5,10",                             // plato del día, pan y postre
   updatedBy: "persona@ejemplo.com",
   updatedAt: <timestamp>
 }

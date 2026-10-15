@@ -1,16 +1,21 @@
-// Página de gestión (requiere sesión de login.html): OCR de la foto y edición manual.
+// Página de gestión (requiere sesión de login.html): se edita una semana entera, a mano
+// o leyendo la foto de la hoja semanal con OCR.
 import { signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js";
 import {
   doc,
   getDoc,
-  setDoc,
+  writeBatch,
   serverTimestamp
 } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js";
-import { auth, db, MENUS, SECTIONS, toISODate, emailOf, isAuthorized } from "./firebase-config.js";
-import { findColumns, findPostre, findPrice, findCell, cleanCell, weekdayIndex, DAYS } from "./ocr-parser.js";
+import {
+  auth, db, MENUS, POSTRE, PRECIO_DEFECTO, DAY_NAMES,
+  toISODate, fromISODate, addDays, mondayOf, emailOf, isAuthorized
+} from "./firebase-config.js";
+import { findColumns, findPostre, findPrice, findCell, findWeek, cleanCell } from "./ocr-parser.js";
 
 const $ = (id) => document.getElementById(id);
 let currentEmail = "";
+let monday = mondayOf(toISODate(new Date()));
 
 // ---------- Sesión: sin usuario autorizado se vuelve a login.html ----------
 
@@ -30,118 +35,108 @@ onAuthStateChanged(auth, async (user) => {
     $("userEmail").textContent = email;
     $("loading").hidden = true;
     $("editorView").hidden = false;
-    loadMenu();
+    setWeek(monday);
   } else {
     await signOut(auth);
     window.location.replace("./login.html?error=no-autorizado");
   }
 });
 
-// ---------- Editor de platos ----------
+// ---------- Editor de la semana ----------
 
-function addDish(section, value = "") {
-  const li = document.createElement("li");
-  li.className = "edit-item";
+$("postreFijo").textContent = POSTRE;
+$("priceInput").value = PRECIO_DEFECTO;
 
+const weekDates = () => DAY_NAMES.map((_, i) => addDays(monday, i));
+const shortDate = (s) => fromISODate(s).toLocaleDateString("es-ES", { day: "numeric", month: "long" });
+const dayInput = (i) => $(`plato-${i}`);
+
+// Una fila por día: "Lunes 12 de octubre" + campo del plato
+const grid = $("weekGrid");
+DAY_NAMES.forEach((name, i) => {
+  const label = document.createElement("label");
+  label.htmlFor = `plato-${i}`;
+  label.innerHTML = `${name} <small id="date-${i}"></small>`;
   const input = document.createElement("input");
+  input.id = `plato-${i}`;
   input.type = "text";
-  input.value = value;
-  input.placeholder = "Nombre del plato";
+  input.placeholder = "Plato del día (o Festivo)";
+  grid.append(label, input);
+});
 
-  const move = document.createElement("select");
-  move.title = "Mover a otra sección";
-  for (const s of SECTIONS) {
-    const opt = document.createElement("option");
-    opt.value = s.key;
-    opt.textContent = s.label;
-    opt.selected = s.key === section;
-    move.appendChild(opt);
-  }
-  move.addEventListener("change", () => $(`edit-${move.value}`).appendChild(li));
-
-  const del = document.createElement("button");
-  del.type = "button";
-  del.className = "btn-icon";
-  del.textContent = "✕";
-  del.title = "Eliminar";
-  del.addEventListener("click", () => li.remove());
-
-  li.append(input, move, del);
-  $(`edit-${section}`).appendChild(li);
-  return input;
+function readWeek() {
+  return DAY_NAMES.map((_, i) => dayInput(i).value.trim());
 }
 
-function setMenu(data) {
-  for (const { key } of SECTIONS) {
-    $(`edit-${key}`).innerHTML = "";
-    for (const dish of data[key] || []) addDish(key, dish);
-  }
-  $("notesInput").value = data.notas || "";
+function fillWeek(platos) {
+  platos.forEach((p, i) => (dayInput(i).value = p || ""));
 }
 
-function isEmpty(data) {
-  return SECTIONS.every(({ key }) => !data[key] || data[key].length === 0);
+// Cambia la semana mostrada; con load = true trae lo que ya hay guardado
+async function setWeek(newMonday, load = true) {
+  monday = newMonday;
+  $("weekDate").value = monday;
+  const dates = weekDates();
+  dates.forEach((d, i) => ($(`date-${i}`).textContent = shortDate(d)));
+  $("weekLabel").textContent = `Del lunes ${shortDate(dates[0])} al viernes ${shortDate(dates[4])}`;
+  if (load) await loadWeek();
 }
 
-function readMenu() {
-  const data = {};
-  for (const { key } of SECTIONS) {
-    data[key] = [...$(`edit-${key}`).querySelectorAll("input")]
-      .map((i) => i.value.trim())
-      .filter(Boolean);
-  }
-  data.notas = $("notesInput").value.trim();
-  return data;
-}
-
-document.querySelectorAll(".add-btn").forEach((btn) =>
-  btn.addEventListener("click", () => addDish(btn.dataset.section).focus())
-);
+$("weekDate").addEventListener("change", () => {
+  if ($("weekDate").value) setWeek(mondayOf($("weekDate").value));
+});
 
 $("clearBtn").addEventListener("click", () => {
-  if (confirm("¿Vaciar todos los platos del editor? (No se borra nada hasta que guardes)")) setMenu({});
+  if (confirm("¿Vaciar los platos de la semana? (No se borra nada hasta que guardes)")) fillWeek([]);
 });
 
 // ---------- Carga y guardado en Firestore ----------
 
-$("menuDate").value = toISODate(new Date());
-$("menuDate").addEventListener("change", loadMenu);
+// Los menús guardados antes del cambio a un solo plato tenían una lista "primeros"
+const platoOf = (data) => (data.plato || (data.primeros || []).join(", ")).trim();
 
-async function loadMenu() {
-  const date = $("menuDate").value;
-  if (!date) return;
+async function loadWeek() {
   $("saveMsg").textContent = "";
   try {
-    const snap = await getDoc(doc(db, MENUS, date));
-    setMenu(snap.exists() ? snap.data() : {});
-    if (snap.exists()) $("saveMsg").textContent = "Menú existente cargado para esta fecha.";
+    const snaps = await Promise.all(weekDates().map((d) => getDoc(doc(db, MENUS, d))));
+    fillWeek(snaps.map((s) => (s.exists() ? platoOf(s.data()) : "")));
+    const saved = snaps.find((s) => s.exists() && s.data().precio);
+    $("priceInput").value = saved ? saved.data().precio : PRECIO_DEFECTO;
+    const n = snaps.filter((s) => s.exists()).length;
+    if (n) $("saveMsg").textContent = `Cargados ${n} días ya guardados de esta semana.`;
   } catch (e) {
     console.error("[MENU] Error al cargar", e);
-    $("saveMsg").textContent = "No se pudo cargar el menú de esta fecha.";
+    $("saveMsg").textContent = "No se pudo cargar el menú de esta semana.";
   }
 }
 
 $("saveBtn").addEventListener("click", async () => {
-  const date = $("menuDate").value;
-  if (!date) {
-    $("saveMsg").textContent = "Elige una fecha.";
-    return;
-  }
-  const data = readMenu();
-  if (isEmpty(data)) {
-    $("saveMsg").textContent = "El menú está vacío.";
+  const platos = readWeek();
+  const precio = $("priceInput").value.trim().replace(/\s*€$/, "") || PRECIO_DEFECTO;
+  if (platos.every((p) => !p)) {
+    $("saveMsg").textContent = "No hay ningún plato que guardar.";
     return;
   }
   $("saveBtn").disabled = true;
   $("saveMsg").textContent = "Guardando…";
   try {
-    await setDoc(doc(db, MENUS, date), {
-      ...data,
-      fecha: date,
-      updatedBy: currentEmail,
-      updatedAt: serverTimestamp()
+    // Todos los días de la semana en una sola escritura; los días vacíos no se tocan
+    const batch = writeBatch(db);
+    const dates = weekDates();
+    let n = 0;
+    platos.forEach((plato, i) => {
+      if (!plato) return;
+      batch.set(doc(db, MENUS, dates[i]), {
+        fecha: dates[i],
+        plato,
+        precio,
+        updatedBy: currentEmail,
+        updatedAt: serverTimestamp()
+      });
+      n++;
     });
-    $("saveMsg").textContent = `Menú del ${date} guardado.`;
+    await batch.commit();
+    $("saveMsg").textContent = `Guardados ${n} días de la semana del ${shortDate(dates[0])}.`;
   } catch (e) {
     console.error("[MENU] Error al guardar", e);
     $("saveMsg").textContent = e.code === "permission-denied"
@@ -232,18 +227,9 @@ function cropCell(source, rect, scale = 2, pad = 20) {
   return out;
 }
 
-const DAY_LABELS = ["lunes", "martes", "miércoles", "jueves", "viernes"];
-
-// Hoja semanal: se localiza la columna del día de la fecha elegida y se lee solo esa celda
+// Hoja semanal: se localizan las columnas LUNES..VIERNES y se lee cada celda por separado
 $("ocrBtn").addEventListener("click", async () => {
   if (!selectedFile) return;
-
-  const date = $("menuDate").value;
-  const dayIndex = date ? weekdayIndex(date) : -1;
-  if (dayIndex < 0) {
-    $("ocrMsg").textContent = "Elige una fecha de lunes a viernes: la hoja solo tiene esos días.";
-    return;
-  }
 
   $("ocrBtn").disabled = true;
   $("ocrProgress").hidden = false;
@@ -263,48 +249,53 @@ $("ocrBtn").addEventListener("click", async () => {
     });
     const canvas = await preprocess(selectedFile);
 
-    // 1ª pasada: toda la hoja, para encontrar las cabeceras de los días y el postre
+    // 1ª pasada: toda la hoja, para encontrar la semana, las cabeceras de los días y el postre
     const { data } = await worker.recognize(canvas);
     $("rawText").textContent = data.text;
     $("rawBox").hidden = false;
 
     const cols = findColumns(data.words);
     if (!cols) {
-      $("ocrMsg").textContent = "No encontré los días de la semana en la foto. Prueba con una foto más recta o escribe el plato a mano.";
+      $("ocrMsg").textContent = "No encontré los días de la semana en la foto. Prueba con una foto más recta o escribe los platos a mano.";
       return;
     }
-    const postre = findPostre(data.lines);
-    const price = findPrice(data.lines);
-    const bottomY = (postre || price)?.bbox.y0 ?? cols.headerBottom + Math.abs(cols.spacing);
+    const bottomY = (findPostre(data.lines) || findPrice(data.lines))?.bbox.y0
+      ?? cols.headerBottom + Math.abs(cols.spacing);
 
-    // 2ª pasada: solo la celda del día elegido, leída como un bloque de texto
-    const rect = findCell(cols, dayIndex, bottomY, canvas.width);
-    let plato = "";
-    if (rect) {
-      step = `Leyendo el plato del ${DAY_LABELS[dayIndex]}`;
-      await worker.setParameters({ tessedit_pageseg_mode: Tesseract.PSM.SINGLE_BLOCK });
-      const cell = await worker.recognize(cropCell(canvas, rect));
-      plato = cleanCell(cell.data.lines);
-      console.log(`[OCR] Celda de ${DAYS[dayIndex]}`, rect, cell.data.text);
+    // 2ª pasada: cada celda por separado, leída como un bloque de texto
+    await worker.setParameters({ tessedit_pageseg_mode: Tesseract.PSM.SINGLE_BLOCK });
+    const platos = [];
+    for (let i = 0; i < DAY_NAMES.length; i++) {
+      step = `Leyendo el ${DAY_NAMES[i].toLowerCase()}`;
+      const rect = findCell(cols, i, bottomY, canvas.width);
+      const cell = rect ? await worker.recognize(cropCell(canvas, rect)) : null;
+      platos.push(cell ? cleanCell(cell.data.lines) : "");
+      console.log(`[OCR] ${DAY_NAMES[i]}:`, platos[i] || "(sin leer)");
     }
 
-    if (!plato) {
-      $("ocrMsg").textContent = `No pude leer el plato del ${DAY_LABELS[dayIndex]}. Escríbelo a mano.`;
+    if (platos.every((p) => !p)) {
+      $("ocrMsg").textContent = "No pude leer ningún plato. Prueba con otra foto o escríbelos a mano.";
       return;
     }
 
-    if (!isEmpty(readMenu()) && !confirm("Ya hay datos en el editor. ¿Reemplazarlos por los reconocidos?")) {
+    // Si la hoja dice la semana ("DEL 12 AL 16 DE OCTUBRE"), se cambia a esa semana
+    const detected = findWeek(data.text, fromISODate(monday).getFullYear());
+    const weekChanged = detected && detected !== monday;
+    if (weekChanged) await setWeek(detected);
+
+    if (readWeek().some(Boolean) &&
+        !confirm("Ya hay platos en esta semana. ¿Reemplazarlos por los de la foto?")) {
       $("ocrMsg").textContent = "Reconocimiento descartado.";
       return;
     }
+    fillWeek(platos);
 
-    setMenu({
-      primeros: [plato],
-      postres: postre?.text ? [postre.text] : [],
-      // El precio se lee mal (letra muy clara), así que las notas no se rellenan solas
-      notas: $("notesInput").value
-    });
-    $("ocrMsg").textContent = `Plato del ${DAY_LABELS[dayIndex]} reconocido. Revísalo y pulsa Guardar.`;
+    const missing = DAY_NAMES.filter((_, i) => !platos[i]);
+    $("ocrMsg").textContent =
+      (weekChanged ? `La hoja es de la semana del ${shortDate(detected)}. ` : "") +
+      (missing.length
+        ? `No pude leer: ${missing.join(", ")}. Escríbelo a mano y pulsa Guardar semana.`
+        : "Semana reconocida. Revísala y pulsa Guardar semana.");
   } catch (e) {
     console.error("[OCR] Error", e);
     $("ocrMsg").textContent = "Error al reconocer la imagen.";

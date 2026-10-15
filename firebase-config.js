@@ -38,10 +38,11 @@ export async function isAuthorized(email) {
   }
 }
 
-export const SECTIONS = [
-  { key: "primeros", label: "Plato del día" },
-  { key: "postres", label: "Postre" }
-];
+// Lo que no cambia de un día a otro
+export const POSTRE = "Pieza de fruta, yogur, lácteos, tarta del día o café";
+export const PRECIO_DEFECTO = "5,10"; // plato del día, pan y postre
+
+export const DAY_NAMES = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes"];
 
 // Fecha local en formato YYYY-MM-DD (sin desfase UTC)
 export function toISODate(d) {
@@ -54,6 +55,18 @@ export function toISODate(d) {
 export function fromISODate(s) {
   const [y, m, d] = s.split("-").map(Number);
   return new Date(y, m - 1, d);
+}
+
+export function addDays(s, n) {
+  const d = fromISODate(s);
+  d.setDate(d.getDate() + n);
+  return toISODate(d);
+}
+
+// Lunes de la semana de una fecha (el sábado y el domingo cuentan como la semana siguiente)
+export function mondayOf(s) {
+  const wd = fromISODate(s).getDay(); // 0 = domingo
+  return addDays(s, wd === 0 ? 1 : wd === 6 ? 2 : 1 - wd);
 }
 
 export function formatLongDate(s) {

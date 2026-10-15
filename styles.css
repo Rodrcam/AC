@@ -91,8 +91,11 @@ input, select, textarea {
 
 .menu {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  grid-template-columns: 1fr 1fr;
   gap: 16px;
+}
+@media (max-width: 560px) {
+  .menu { grid-template-columns: 1fr; }
 }
 .menu-card {
   background: var(--surface);
@@ -107,10 +110,9 @@ input, select, textarea {
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
-.menu-card ul { margin: 0; padding-left: 18px; }
-.menu-card li { padding: 4px 0; }
-.menu-card li.empty { list-style: none; color: var(--muted); margin-left: -18px; }
-.notes { grid-column: 1 / -1; text-align: center; color: var(--muted); margin: 0; }
+.dish { margin: 0; }
+.menu-card--main .dish { font-size: 1.25rem; font-weight: 600; }
+.price { grid-column: 1 / -1; text-align: center; color: var(--muted); margin: 0; }
 
 /* ---------- Gestión ---------- */
 
@@ -152,16 +154,19 @@ input, select, textarea {
 progress { width: 100%; margin-top: 12px; }
 pre { white-space: pre-wrap; font-size: 0.85rem; color: var(--muted); }
 
-.editor-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: 16px;
+.week-label { margin: 8px 0 0; font-weight: 600; }
+.week-grid { display: grid; grid-template-columns: max-content 1fr; gap: 8px 12px; align-items: center; }
+.week-grid label { font-weight: 600; color: var(--accent); }
+.week-grid label small { display: block; font-weight: 400; color: var(--muted); }
+.week-grid input { min-width: 0; }
+.fixed-info { margin: 16px 0 0; padding: 12px; border-radius: 8px; background: var(--bg); font-size: 0.95rem; }
+.fixed-info p { margin: 0 0 4px; }
+.price-field { flex-direction: row; align-items: center; gap: 8px; }
+.price-field input { width: 6em; }
+@media (max-width: 480px) {
+  .week-grid { grid-template-columns: 1fr; gap: 4px; }
+  .week-grid input { margin-bottom: 8px; }
 }
-.editor-col h3 { margin: 0 0 8px; color: var(--accent); font-size: 1rem; }
-.edit-list { list-style: none; margin: 0 0 8px; padding: 0; min-height: 8px; }
-.edit-item { display: flex; gap: 6px; margin-bottom: 6px; }
-.edit-item input { flex: 1; min-width: 0; }
-.edit-item select { width: auto; padding: 8px 4px; }
 
 .actions { display: flex; justify-content: flex-end; gap: 10px; }
 .msg { min-height: 1.5em; color: var(--muted); }

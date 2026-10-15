@@ -15,7 +15,6 @@
     </header>
 
     <main class="container">
-      <!-- Editor -->
       <section id="editorView" hidden>
         <div class="userbar">
           <span>Conectado como <strong id="userEmail"></strong></span>
@@ -24,17 +23,18 @@
 
         <div class="panel">
           <label class="field">
-            <span>Fecha del menú</span>
-            <input id="menuDate" type="date" />
+            <span>Semana (elige cualquier día de la semana)</span>
+            <input id="weekDate" type="date" />
           </label>
+          <p id="weekLabel" class="week-label"></p>
         </div>
 
         <div class="panel">
-          <h2>1. Foto del menú (opcional)</h2>
-          <p class="hint">Haz una foto de la hoja semanal, recta y con buena luz. Se lee en tu navegador y se coge el plato del día de la fecha elegida y el postre. Revísalo antes de guardar.</p>
+          <h2>1. Foto de la hoja semanal (opcional)</h2>
+          <p class="hint">Haz una foto de la hoja del plato del día, recta y con buena luz. Se lee en tu navegador y se rellenan los cinco días. Si la hoja indica la semana, se elige sola. Revísalo antes de guardar.</p>
           <input id="photoInput" type="file" accept="image/*" capture="environment" />
           <img id="photoPreview" class="photo-preview" alt="Vista previa de la foto" hidden />
-          <button id="ocrBtn" type="button" disabled>Reconocer texto</button>
+          <button id="ocrBtn" type="button" disabled>Reconocer la semana</button>
           <progress id="ocrProgress" max="1" value="0" hidden></progress>
           <p id="ocrMsg" class="msg"></p>
           <details id="rawBox" hidden>
@@ -45,27 +45,22 @@
 
         <div class="panel">
           <h2>2. Revisa y edita</h2>
-          <div class="editor-grid">
-            <div class="editor-col" data-section="primeros">
-              <h3>Plato del día</h3>
-              <ul class="edit-list" id="edit-primeros"></ul>
-              <button type="button" class="btn-secondary add-btn" data-section="primeros">+ Añadir plato</button>
-            </div>
-            <div class="editor-col" data-section="postres">
-              <h3>Postre</h3>
-              <ul class="edit-list" id="edit-postres"></ul>
-              <button type="button" class="btn-secondary add-btn" data-section="postres">+ Añadir postre</button>
-            </div>
+          <div id="weekGrid" class="week-grid"></div>
+
+          <div class="fixed-info">
+            <p><strong>Postre (siempre el mismo):</strong> <span id="postreFijo"></span></p>
+            <p>El menú incluye siempre plato del día, pan y postre.</p>
+            <label class="field price-field">
+              <span>Precio del menú</span>
+              <input id="priceInput" type="text" inputmode="decimal" />
+              <span>€</span>
+            </label>
           </div>
-          <label class="field">
-            <span>Notas (precio, pan y bebida, alérgenos…)</span>
-            <textarea id="notesInput" rows="2"></textarea>
-          </label>
         </div>
 
         <div class="actions">
           <button id="clearBtn" type="button" class="btn-secondary">Vaciar</button>
-          <button id="saveBtn" type="button">Guardar menú</button>
+          <button id="saveBtn" type="button">Guardar semana</button>
         </div>
         <p id="saveMsg" class="msg"></p>
       </section>

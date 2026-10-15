@@ -3,7 +3,7 @@
 //
 // Se hace en dos pasadas de OCR:
 //   1. Toda la foto, para localizar las cabeceras de los días y la línea del postre.
-//   2. Solo la celda del día elegido (findCell devuelve ese rectángulo).
+//   2. Cada celda por separado (findCell devuelve el rectángulo de cada día).
 
 export const DAYS = ["lunes", "martes", "miercoles", "jueves", "viernes"];
 
@@ -109,9 +109,20 @@ function capitalize(s) {
   return s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
 }
 
-// Índice 0-4 (lunes-viernes) de una fecha YYYY-MM-DD, o -1 si es fin de semana
-export function weekdayIndex(isoDate) {
-  const [y, m, d] = isoDate.split("-").map(Number);
-  const wd = new Date(y, m - 1, d).getDay(); // 0 = domingo
-  return wd >= 1 && wd <= 5 ? wd - 1 : -1;
+const MONTHS = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio",
+  "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+
+// Lunes (YYYY-MM-DD) de la semana que indica la cabecera, por ejemplo
+// "PLATO DEL DÍA DEL 12 AL 16 DE OCTUBRE DE 2026". Se usa el último día ("al 16 de
+// octubre"), que debe caer en viernes; si no cuadra, se devuelve null.
+export function findWeek(text, fallbackYear) {
+  const m = norm(text).replace(/\s+/g, " ").match(/\bal (\d{1,2}) de ([a-z]{4,})(?: de (\d{4}))?/);
+  if (!m) return null;
+  const month = MONTHS.findIndex((name) => m[2].startsWith(name.slice(0, 4)));
+  if (month < 0) return null;
+  const friday = new Date(m[3] ? Number(m[3]) : fallbackYear, month, Number(m[1]));
+  if (friday.getDay() !== 5) return null;
+  friday.setDate(friday.getDate() - 4);
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${friday.getFullYear()}-${pad(friday.getMonth() + 1)}-${pad(friday.getDate())}`;
 }
