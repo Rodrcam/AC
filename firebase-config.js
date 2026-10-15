@@ -39,9 +39,8 @@ export async function isAuthorized(email) {
 }
 
 export const SECTIONS = [
-  { key: "primeros", label: "Primeros" },
-  { key: "segundos", label: "Segundos" },
-  { key: "postres", label: "Postres" }
+  { key: "primeros", label: "Plato del día" },
+  { key: "postres", label: "Postre" }
 ];
 
 // Fecha local en formato YYYY-MM-DD (sin desfase UTC)

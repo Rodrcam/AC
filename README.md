@@ -7,7 +7,7 @@ Web estática para GitHub Pages. Todo corre en el navegador: Firebase por CDN y 
 - `index.html`, `styles.css`, `main.js`: página pública con el menú del día (flechas para cambiar de día, `?fecha=AAAA-MM-DD` para enlazar uno).
 - `login.html` + `login.js`: login como el de `join.html` (Google o Microsoft, con ventana emergente), pero sin escribir en `tempusers`. Si el correo está en `canteen`, lleva a la gestión.
 - `gestion.html` + `gestion.js`: foto del menú con OCR y edición manual. Sin sesión autorizada vuelve a `login.html`.
-- `ocr-parser.js`: reparte el texto del OCR en primeros, segundos y postres según las cabeceras ("Primeros", "1er plato", "Segundos", "2º plato", "Postres"...). Lo que no tiene cabecera va a Primeros y se mueve con el selector.
+- `ocr-parser.js`: lee la hoja semanal "PLATO DEL DÍA". Localiza las columnas LUNES a VIERNES, lee solo la celda del día de la fecha elegida y coge la línea "Postre: ...". Las notas (por ejemplo el precio) se escriben a mano.
 - `firebase-config.js`: la misma config pública de `arise-a3be8` que usa `join.html`.
 
 La foto no se sube a ningún sitio: se procesa en el navegador y solo se guarda el texto del menú.
@@ -26,10 +26,9 @@ canteen/
 ```
 canteen_menus/2026-10-15 {
   fecha: "2026-10-15",
-  primeros: ["Lentejas", "Ensalada mixta"],
-  segundos: ["Pollo asado", "Merluza"],
-  postres: ["Fruta", "Flan"],
-  notas: "9,50 € con pan y bebida",
+  primeros: ["Albóndigas en salsa con patatas"],   // plato del día
+  postres: ["Pieza de fruta, yogur, lácteos, tarta del día o café"],
+  notas: "PLATO DEL DÍA, PAN Y POSTRE 5,10€ (I.V.A incluido)",
   updatedBy: "persona@ejemplo.com",
   updatedAt: <timestamp>
 }

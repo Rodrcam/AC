@@ -7,7 +7,7 @@ import {
   serverTimestamp
 } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js";
 import { auth, db, MENUS, SECTIONS, toISODate, emailOf, isAuthorized } from "./firebase-config.js";
-import { parseMenu } from "./ocr-parser.js";
+import { findColumns, findPostre, findPrice, findCell, cleanCell, weekdayIndex, DAYS } from "./ocr-parser.js";
 
 const $ = (id) => document.getElementById(id);
 let currentEmail = "";
@@ -79,6 +79,10 @@ function setMenu(data) {
   $("notesInput").value = data.notas || "";
 }
 
+function isEmpty(data) {
+  return SECTIONS.every(({ key }) => !data[key] || data[key].length === 0);
+}
+
 function readMenu() {
   const data = {};
   for (const { key } of SECTIONS) {
@@ -124,7 +128,7 @@ $("saveBtn").addEventListener("click", async () => {
     return;
   }
   const data = readMenu();
-  if (!data.primeros.length && !data.segundos.length && !data.postres.length) {
+  if (isEmpty(data)) {
     $("saveMsg").textContent = "El menú está vacío.";
     return;
   }
@@ -176,52 +180,136 @@ async function preprocess(file) {
   return canvas;
 }
 
+// Recorta la celda en un lienzo aparte, en blanco y negro y con margen blanco.
+// Binarizar a mano evita que Tesseract confunda el fondo gris del papel con tinta.
+function cropCell(source, rect, scale = 2, pad = 20) {
+  // Se amplía la celda: Tesseract acierta más con letras de unos 30 px
+  const w = rect.width * scale, h = rect.height * scale;
+  const big = document.createElement("canvas");
+  big.width = w;
+  big.height = h;
+  const bctx = big.getContext("2d");
+  bctx.imageSmoothingQuality = "high";
+  bctx.drawImage(source, rect.left, rect.top, rect.width, rect.height, 0, 0, w, h);
+  const pixels = bctx.getImageData(0, 0, w, h);
+  const d = pixels.data;
+
+  // La celda es casi toda fondo: lo que esté bastante por debajo de la media es tinta
+  let sum = 0;
+  for (let i = 0; i < d.length; i += 4) sum += d[i];
+  const threshold = sum / (d.length / 4) - 50;
+  const ink = new Uint8Array(w * h);
+  for (let p = 0; p < w * h; p++) ink[p] = d[p * 4] < threshold ? 1 : 0;
+
+  // Borra las líneas de la tabla: manchas conectadas mucho más altas o anchas que una letra
+  const seen = new Uint8Array(w * h);
+  for (let start = 0; start < w * h; start++) {
+    if (!ink[start] || seen[start]) continue;
+    const comp = [start];
+    seen[start] = 1;
+    let x0 = w, x1 = 0, y0 = h, y1 = 0;
+    for (let k = 0; k < comp.length; k++) {
+      const p = comp[k], x = p % w, y = (p - x) / w;
+      if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y;
+      for (const q of [p - 1, p + 1, p - w, p + w]) {
+        if (q < 0 || q >= w * h || seen[q] || !ink[q]) continue;
+        if ((q === p - 1 || q === p + 1) && Math.floor(q / w) !== y) continue;
+        seen[q] = 1;
+        comp.push(q);
+      }
+    }
+    if (y1 - y0 > h * 0.25 || x1 - x0 > w * 0.6) for (const p of comp) ink[p] = 0;
+  }
+  for (let p = 0; p < w * h; p++) d[p * 4] = d[p * 4 + 1] = d[p * 4 + 2] = ink[p] ? 0 : 255;
+
+  const out = document.createElement("canvas");
+  out.width = w + pad * 2;
+  out.height = h + pad * 2;
+  const ctx = out.getContext("2d");
+  ctx.fillStyle = "#fff";
+  ctx.fillRect(0, 0, out.width, out.height);
+  ctx.putImageData(pixels, pad, pad);
+  return out;
+}
+
+const DAY_LABELS = ["lunes", "martes", "miércoles", "jueves", "viernes"];
+
+// Hoja semanal: se localiza la columna del día de la fecha elegida y se lee solo esa celda
 $("ocrBtn").addEventListener("click", async () => {
   if (!selectedFile) return;
+
+  const date = $("menuDate").value;
+  const dayIndex = date ? weekdayIndex(date) : -1;
+  if (dayIndex < 0) {
+    $("ocrMsg").textContent = "Elige una fecha de lunes a viernes: la hoja solo tiene esos días.";
+    return;
+  }
+
   $("ocrBtn").disabled = true;
   $("ocrProgress").hidden = false;
   $("ocrProgress").value = 0;
   $("ocrMsg").textContent = "Preparando OCR (la primera vez descarga el idioma español)…";
 
+  let step = "Leyendo la hoja";
+  let worker;
   try {
-    const canvas = await preprocess(selectedFile);
-    const { data } = await Tesseract.recognize(canvas, "spa", {
+    worker = await Tesseract.createWorker("spa", 1, {
       logger: (m) => {
         if (m.status === "recognizing text") {
           $("ocrProgress").value = m.progress;
-          $("ocrMsg").textContent = `Reconociendo texto… ${Math.round(m.progress * 100)}%`;
+          $("ocrMsg").textContent = `${step}… ${Math.round(m.progress * 100)}%`;
         }
       }
     });
+    const canvas = await preprocess(selectedFile);
 
+    // 1ª pasada: toda la hoja, para encontrar las cabeceras de los días y el postre
+    const { data } = await worker.recognize(canvas);
     $("rawText").textContent = data.text;
     $("rawBox").hidden = false;
 
-    const parsed = parseMenu(data.text);
-    // Lo que no tenía cabecera va a "Primeros" para recolocarlo a mano
-    parsed.primeros.push(...parsed.sinClasificar);
+    const cols = findColumns(data.words);
+    if (!cols) {
+      $("ocrMsg").textContent = "No encontré los días de la semana en la foto. Prueba con una foto más recta o escribe el plato a mano.";
+      return;
+    }
+    const postre = findPostre(data.lines);
+    const price = findPrice(data.lines);
+    const bottomY = (postre || price)?.bbox.y0 ?? cols.headerBottom + Math.abs(cols.spacing);
 
-    const total = parsed.primeros.length + parsed.segundos.length + parsed.postres.length;
-    if (!total) {
-      $("ocrMsg").textContent = "No se reconocieron platos. Prueba con otra foto o escríbelos a mano.";
+    // 2ª pasada: solo la celda del día elegido, leída como un bloque de texto
+    const rect = findCell(cols, dayIndex, bottomY, canvas.width);
+    let plato = "";
+    if (rect) {
+      step = `Leyendo el plato del ${DAY_LABELS[dayIndex]}`;
+      await worker.setParameters({ tessedit_pageseg_mode: Tesseract.PSM.SINGLE_BLOCK });
+      const cell = await worker.recognize(cropCell(canvas, rect));
+      plato = cleanCell(cell.data.lines);
+      console.log(`[OCR] Celda de ${DAYS[dayIndex]}`, rect, cell.data.text);
+    }
+
+    if (!plato) {
+      $("ocrMsg").textContent = `No pude leer el plato del ${DAY_LABELS[dayIndex]}. Escríbelo a mano.`;
       return;
     }
 
-    const hasContent = readMenu();
-    if ((hasContent.primeros.length || hasContent.segundos.length || hasContent.postres.length) &&
-        !confirm("Ya hay platos en el editor. ¿Reemplazarlos por los reconocidos?")) {
+    if (!isEmpty(readMenu()) && !confirm("Ya hay datos en el editor. ¿Reemplazarlos por los reconocidos?")) {
       $("ocrMsg").textContent = "Reconocimiento descartado.";
       return;
     }
 
-    setMenu({ ...parsed, notas: $("notesInput").value });
-    $("ocrMsg").textContent = parsed.sinClasificar.length
-      ? `${total} platos reconocidos. Algunos no tenían sección y se han puesto en Primeros: muévelos con el selector.`
-      : `${total} platos reconocidos. Revísalos y pulsa Guardar.`;
+    setMenu({
+      primeros: [plato],
+      postres: postre?.text ? [postre.text] : [],
+      // El precio se lee mal (letra muy clara), así que las notas no se rellenan solas
+      notas: $("notesInput").value
+    });
+    $("ocrMsg").textContent = `Plato del ${DAY_LABELS[dayIndex]} reconocido. Revísalo y pulsa Guardar.`;
   } catch (e) {
     console.error("[OCR] Error", e);
     $("ocrMsg").textContent = "Error al reconocer la imagen.";
   } finally {
+    if (worker) await worker.terminate();
     $("ocrBtn").disabled = false;
     $("ocrProgress").hidden = true;
   }

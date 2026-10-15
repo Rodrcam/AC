@@ -84,7 +84,8 @@ input, select, textarea {
 }
 .date-nav > button { font-size: 1.4rem; padding: 4px 16px; }
 .date-nav__center { text-align: center; }
-.date-label { display: block; font-weight: 600; text-transform: capitalize; }
+.date-label { display: block; font-weight: 600; }
+.date-label::first-letter { text-transform: uppercase; }
 
 .status { text-align: center; color: var(--muted); padding: 24px 0; }
 

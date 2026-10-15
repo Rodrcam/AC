@@ -31,7 +31,7 @@
 
         <div class="panel">
           <h2>1. Foto del menú (opcional)</h2>
-          <p class="hint">Haz una foto recta y con buena luz. El texto se lee en tu navegador y se reparte en primeros, segundos y postres. Revísalo antes de guardar.</p>
+          <p class="hint">Haz una foto de la hoja semanal, recta y con buena luz. Se lee en tu navegador y se coge el plato del día de la fecha elegida y el postre. Revísalo antes de guardar.</p>
           <input id="photoInput" type="file" accept="image/*" capture="environment" />
           <img id="photoPreview" class="photo-preview" alt="Vista previa de la foto" hidden />
           <button id="ocrBtn" type="button" disabled>Reconocer texto</button>
@@ -47,19 +47,14 @@
           <h2>2. Revisa y edita</h2>
           <div class="editor-grid">
             <div class="editor-col" data-section="primeros">
-              <h3>Primeros</h3>
+              <h3>Plato del día</h3>
               <ul class="edit-list" id="edit-primeros"></ul>
               <button type="button" class="btn-secondary add-btn" data-section="primeros">+ Añadir plato</button>
             </div>
-            <div class="editor-col" data-section="segundos">
-              <h3>Segundos</h3>
-              <ul class="edit-list" id="edit-segundos"></ul>
-              <button type="button" class="btn-secondary add-btn" data-section="segundos">+ Añadir plato</button>
-            </div>
             <div class="editor-col" data-section="postres">
-              <h3>Postres</h3>
+              <h3>Postre</h3>
               <ul class="edit-list" id="edit-postres"></ul>
-              <button type="button" class="btn-secondary add-btn" data-section="postres">+ Añadir plato</button>
+              <button type="button" class="btn-secondary add-btn" data-section="postres">+ Añadir postre</button>
             </div>
           </div>
           <label class="field">
