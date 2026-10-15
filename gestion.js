@@ -1,99 +1,39 @@
-// Página de gestión: login con correo autorizado, OCR de la foto y edición manual.
-import {
-  GoogleAuthProvider,
-  OAuthProvider,
-  signInWithPopup,
-  signOut,
-  onAuthStateChanged
-} from "https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js";
+// Página de gestión (requiere sesión de login.html): OCR de la foto y edición manual.
+import { signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js";
 import {
   doc,
   getDoc,
   setDoc,
   serverTimestamp
 } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js";
-import { auth, db, MENUS, ADMINS, SECTIONS, toISODate } from "./firebase-config.js";
+import { auth, db, MENUS, SECTIONS, toISODate, emailOf, isAuthorized } from "./firebase-config.js";
 import { parseMenu } from "./ocr-parser.js";
 
 const $ = (id) => document.getElementById(id);
 let currentEmail = "";
 
-// ---------- Autenticación (mismo flujo que join.html, sin escribir en tempusers) ----------
+// ---------- Sesión: sin usuario autorizado se vuelve a login.html ----------
 
-function createProvider(type) {
-  if (type === "google") {
-    const p = new GoogleAuthProvider();
-    p.addScope("email");
-    p.addScope("profile");
-    p.setCustomParameters({ prompt: "select_account" });
-    return p;
-  }
-  const p = new OAuthProvider("microsoft.com");
-  p.addScope("email");
-  p.addScope("openid");
-  p.addScope("profile");
-  p.setCustomParameters({ prompt: "select_account" });
-  return p;
-}
-
-function emailOf(user) {
-  const provider = user.providerData[0];
-  return ((provider && provider.email) || user.email || "").trim().toLowerCase();
-}
-
-// Un correo está autorizado si existe el documento canteen_admins/{email}
-async function isAuthorized(email) {
-  if (!email) return false;
-  try {
-    const snap = await getDoc(doc(db, ADMINS, email));
-    return snap.exists();
-  } catch (e) {
-    // permission-denied también significa "no autorizado"
-    console.warn("[AUTH] No se pudo comprobar la autorización", e.code || e);
-    return false;
-  }
-}
-
-async function handleLogin(button, type) {
-  button.disabled = true;
-  $("loginMsg").textContent = "";
-  try {
-    await signInWithPopup(auth, createProvider(type));
-    // onAuthStateChanged se encarga del resto
-  } catch (e) {
-    console.error("[AUTH] Error", e);
-    $("loginMsg").textContent = "No se pudo iniciar sesión.";
-  } finally {
-    button.disabled = false;
-  }
-}
-
-$("googleBtn").addEventListener("click", function () { handleLogin(this, "google"); });
-$("microsoftBtn").addEventListener("click", function () { handleLogin(this, "microsoft"); });
-$("logoutBtn").addEventListener("click", () => signOut(auth));
-
-function showView(view) {
-  $("loading").hidden = true;
-  $("loginView").hidden = view !== "login";
-  $("editorView").hidden = view !== "editor";
-}
+$("logoutBtn").addEventListener("click", async () => {
+  await signOut(auth);
+  window.location.replace("./login.html");
+});
 
 onAuthStateChanged(auth, async (user) => {
   if (!user) {
-    currentEmail = "";
-    showView("login");
+    window.location.replace("./login.html");
     return;
   }
   const email = emailOf(user);
   if (await isAuthorized(email)) {
     currentEmail = email;
     $("userEmail").textContent = email;
-    showView("editor");
+    $("loading").hidden = true;
+    $("editorView").hidden = false;
     loadMenu();
   } else {
     await signOut(auth);
-    showView("login");
-    $("loginMsg").textContent = `El correo ${email || "(desconocido)"} no está autorizado para gestionar el menú.`;
+    window.location.replace("./login.html?error=no-autorizado");
   }
 });
 

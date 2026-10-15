@@ -5,7 +5,8 @@ Web estática para GitHub Pages. Todo corre en el navegador: Firebase por CDN y 
 ## Archivos
 
 - `index.html`, `styles.css`, `main.js`: página pública con el menú del día (flechas para cambiar de día, `?fecha=AAAA-MM-DD` para enlazar uno).
-- `gestion.html` + `gestion.js`: login con Google o Microsoft, foto del menú con OCR y edición manual.
+- `login.html` + `login.js`: login como el de `join.html` (Google o Microsoft), pero por redirección en vez de ventana emergente y sin escribir en `tempusers`. Si el correo está en `canteen`, lleva a la gestión.
+- `gestion.html` + `gestion.js`: foto del menú con OCR y edición manual. Sin sesión autorizada vuelve a `login.html`.
 - `ocr-parser.js`: reparte el texto del OCR en primeros, segundos y postres según las cabeceras ("Primeros", "1er plato", "Segundos", "2º plato", "Postres"...). Lo que no tiene cabecera va a Primeros y se mueve con el selector.
 - `firebase-config.js`: la misma config pública de `arise-a3be8` que usa `join.html`.
 
@@ -13,10 +14,10 @@ La foto no se sube a ningún sitio: se procesa en el navegador y solo se guarda 
 
 ## Lo que tienes que crear en Firestore
 
-**Correos autorizados**: colección `canteen_admins`, un documento por correo, con el correo en minúsculas como ID del documento. El contenido da igual (por ejemplo `{ nombre: "..." }`).
+**Correos autorizados**: colección `canteen`, un documento por correo, con el correo en minúsculas como ID del documento. El contenido da igual (por ejemplo `{ nombre: "..." }`).
 
 ```
-canteen_admins/
+canteen/
   persona@ejemplo.com   { nombre: "Persona" }
 ```
 
@@ -42,10 +43,10 @@ Añádelas dentro de tu `match /databases/{database}/documents { ... }` existent
 function isCanteenAdmin() {
   return request.auth != null
     && request.auth.token.email != null
-    && exists(/databases/$(database)/documents/canteen_admins/$(request.auth.token.email.lower()));
+    && exists(/databases/$(database)/documents/canteen/$(request.auth.token.email.lower()));
 }
 
-match /canteen_admins/{email} {
+match /canteen/{email} {
   // Cada usuario solo puede comprobar si su propio correo está autorizado
   allow read: if request.auth != null && request.auth.token.email.lower() == email;
   allow write: if false; // se gestiona desde la consola de Firebase

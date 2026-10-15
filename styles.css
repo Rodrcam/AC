@@ -165,3 +165,28 @@ pre { white-space: pre-wrap; font-size: 0.85rem; color: var(--muted); }
 .actions { display: flex; justify-content: flex-end; gap: 10px; }
 .msg { min-height: 1.5em; color: var(--muted); }
 .msg:empty { display: none; }
+
+/* ---------- Login (misma estructura que join.html) ---------- */
+
+.join {
+  max-width: 420px;
+  margin: 12vh auto 0;
+  padding: 32px 24px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  text-align: center;
+}
+.join .eyebrow {
+  margin: 0;
+  color: var(--accent);
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.join h1 { margin: 8px 0; font-size: 1.6rem; }
+.join .lead { color: var(--muted); margin: 0 0 20px; }
+.join .auth-card { flex-direction: column; }
+.join .auth-card button { width: 100%; }
+.back-link { display: inline-block; margin-top: 16px; color: var(--accent); font-size: 0.9rem; }
