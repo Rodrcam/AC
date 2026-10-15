@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Menú de la cafetería</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <h1>Menú del día</h1>
+      <a class="link-admin" href="gestion.html">Gestión</a>
+    </header>
+
+    <main class="container">
+      <nav class="date-nav">
+        <button id="prevDay" type="button" aria-label="Día anterior">‹</button>
+        <div class="date-nav__center">
+          <span id="dateLabel" class="date-label"></span>
+          <button id="todayBtn" type="button" class="btn-link">Hoy</button>
+        </div>
+        <button id="nextDay" type="button" aria-label="Día siguiente">›</button>
+      </nav>
+
+      <p id="status" class="status">Cargando menú…</p>
+
+      <section id="menu" class="menu" hidden>
+        <article class="menu-card">
+          <h2>Primeros</h2>
+          <ul id="list-primeros"></ul>
+        </article>
+        <article class="menu-card">
+          <h2>Segundos</h2>
+          <ul id="list-segundos"></ul>
+        </article>
+        <article class="menu-card">
+          <h2>Postres</h2>
+          <ul id="list-postres"></ul>
+        </article>
+        <p id="notes" class="notes" hidden></p>
+      </section>
+    </main>
+
+    <script type="module" src="main.js"></script>
+  </body>
+</html>

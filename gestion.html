@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Gestión del menú</title>
+    <link rel="stylesheet" href="styles.css" />
+    <!-- OCR en el navegador (sin servidor) -->
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"></script>
+  </head>
+  <body>
+    <header class="topbar">
+      <h1>Gestión del menú</h1>
+      <a class="link-admin" href="index.html">Ver menú</a>
+    </header>
+
+    <main class="container">
+      <!-- Login -->
+      <section id="loginView" class="panel" hidden>
+        <h2>Acceso restringido</h2>
+        <p>Inicia sesión con un correo autorizado para subir o editar el menú.</p>
+        <div class="auth-card">
+          <button id="googleBtn" type="button">Continuar con Google</button>
+          <button id="microsoftBtn" type="button">Continuar con Microsoft</button>
+        </div>
+        <p id="loginMsg" class="msg"></p>
+      </section>
+
+      <!-- Editor -->
+      <section id="editorView" hidden>
+        <div class="userbar">
+          <span>Conectado como <strong id="userEmail"></strong></span>
+          <button id="logoutBtn" type="button" class="btn-secondary">Cerrar sesión</button>
+        </div>
+
+        <div class="panel">
+          <label class="field">
+            <span>Fecha del menú</span>
+            <input id="menuDate" type="date" />
+          </label>
+        </div>
+
+        <div class="panel">
+          <h2>1. Foto del menú (opcional)</h2>
+          <p class="hint">Haz una foto recta y con buena luz. El texto se lee en tu navegador y se reparte en primeros, segundos y postres. Revísalo antes de guardar.</p>
+          <input id="photoInput" type="file" accept="image/*" capture="environment" />
+          <img id="photoPreview" class="photo-preview" alt="Vista previa de la foto" hidden />
+          <button id="ocrBtn" type="button" disabled>Reconocer texto</button>
+          <progress id="ocrProgress" max="1" value="0" hidden></progress>
+          <p id="ocrMsg" class="msg"></p>
+          <details id="rawBox" hidden>
+            <summary>Ver texto reconocido</summary>
+            <pre id="rawText"></pre>
+          </details>
+        </div>
+
+        <div class="panel">
+          <h2>2. Revisa y edita</h2>
+          <div class="editor-grid">
+            <div class="editor-col" data-section="primeros">
+              <h3>Primeros</h3>
+              <ul class="edit-list" id="edit-primeros"></ul>
+              <button type="button" class="btn-secondary add-btn" data-section="primeros">+ Añadir plato</button>
+            </div>
+            <div class="editor-col" data-section="segundos">
+              <h3>Segundos</h3>
+              <ul class="edit-list" id="edit-segundos"></ul>
+              <button type="button" class="btn-secondary add-btn" data-section="segundos">+ Añadir plato</button>
+            </div>
+            <div class="editor-col" data-section="postres">
+              <h3>Postres</h3>
+              <ul class="edit-list" id="edit-postres"></ul>
+              <button type="button" class="btn-secondary add-btn" data-section="postres">+ Añadir plato</button>
+            </div>
+          </div>
+          <label class="field">
+            <span>Notas (precio, pan y bebida, alérgenos…)</span>
+            <textarea id="notesInput" rows="2"></textarea>
+          </label>
+        </div>
+
+        <div class="actions">
+          <button id="clearBtn" type="button" class="btn-secondary">Vaciar</button>
+          <button id="saveBtn" type="button">Guardar menú</button>
+        </div>
+        <p id="saveMsg" class="msg"></p>
+      </section>
+
+      <p id="loading" class="status">Comprobando sesión…</p>
+    </main>
+
+    <script type="module" src="gestion.js"></script>
+  </body>
+</html>
