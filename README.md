@@ -5,7 +5,7 @@ Web estática para GitHub Pages. Todo corre en el navegador: Firebase por CDN y 
 ## Archivos
 
 - `index.html`, `styles.css`, `main.js`: página pública con el menú del día (flechas para cambiar de día, `?fecha=AAAA-MM-DD` para enlazar uno).
-- `login.html` + `login.js`: login como el de `join.html` (Google o Microsoft), pero por redirección en vez de ventana emergente y sin escribir en `tempusers`. Si el correo está en `canteen`, lleva a la gestión.
+- `login.html` + `login.js`: login como el de `join.html` (Google o Microsoft, con ventana emergente), pero sin escribir en `tempusers`. Si el correo está en `canteen`, lleva a la gestión.
 - `gestion.html` + `gestion.js`: foto del menú con OCR y edición manual. Sin sesión autorizada vuelve a `login.html`.
 - `ocr-parser.js`: reparte el texto del OCR en primeros, segundos y postres según las cabeceras ("Primeros", "1er plato", "Segundos", "2º plato", "Postres"...). Lo que no tiene cabecera va a Primeros y se mueve con el selector.
 - `firebase-config.js`: la misma config pública de `arise-a3be8` que usa `join.html`.

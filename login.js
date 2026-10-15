@@ -1,10 +1,9 @@
-// Login con el mismo flujo que join.html, pero por redirección (sin ventana emergente)
-// y sin escribir en tempusers: solo comprueba que el correo está en "canteen".
+// Login con el mismo flujo que join.html (ventana emergente), pero sin escribir
+// en tempusers: solo comprueba que el correo está en "canteen".
 import {
   GoogleAuthProvider,
   OAuthProvider,
-  signInWithRedirect,
-  getRedirectResult,
+  signInWithPopup,
   onAuthStateChanged,
   signOut
 } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js";
@@ -47,24 +46,39 @@ function createProvider(type) {
 
 async function handleAuth(button, type) {
   logger.auth(`Iniciando autenticación con ${type}`);
+  // Se bloquean los dos botones: un segundo login cancelaría el primero (auth/cancelled-popup-request)
   buttons.forEach((b) => (b.disabled = true));
+  msg.textContent = "";
+
   try {
-    logger.info(`Intentando signInWithRedirect para ${type}`);
-    await signInWithRedirect(auth, createProvider(type));
+    logger.info(`Intentando signInWithPopup para ${type}`);
+    const result = await signInWithPopup(auth, createProvider(type));
+    await checkUser(result.user);
   } catch (e) {
-    logger.error(`Error en autenticación con ${type}`, { message: e.message, code: e.code || 'unknown' });
+    logger.error(`Error en autenticación con ${type}`, {
+      message: e.message,
+      code: e.code || 'unknown',
+      stack: e.stack
+    });
     buttons.forEach((b) => (b.disabled = false));
-    msg.textContent = "No se pudo iniciar sesión.";
+    if (e.code === "auth/popup-blocked") {
+      msg.textContent = "El navegador ha bloqueado la ventana de inicio de sesión. Permite las ventanas emergentes para esta web.";
+    } else if (e.code === "auth/popup-closed-by-user") {
+      msg.textContent = "Has cerrado la ventana antes de terminar.";
+    } else {
+      msg.textContent = "No se pudo iniciar sesión.";
+    }
   }
 }
 
-// Al volver de Google/Microsoft: comprobar el correo y entrar en gestión
+// Comprueba el correo y entra en gestión
 async function checkUser(user) {
   const email = emailOf(user);
   logger.auth(`Usuario autenticado: ${user.uid}`, { email: email || 'No disponible' });
 
   if (await isAuthorized(email)) {
     logger.success(`Correo autorizado en canteen/${email}`);
+    logger.info(`Redirigiendo a gestion.html`);
     window.location.replace("./gestion.html");
   } else {
     logger.error(`Correo no autorizado: ${email}`);
@@ -74,12 +88,9 @@ async function checkUser(user) {
   }
 }
 
-getRedirectResult(auth).catch((e) => {
-  logger.error("Error al volver del inicio de sesión", { message: e.message, code: e.code || 'unknown' });
-  msg.textContent = "No se pudo iniciar sesión.";
-});
-
-onAuthStateChanged(auth, (user) => {
+// Si ya había una sesión abierta, entra directamente
+const stopListening = onAuthStateChanged(auth, (user) => {
+  stopListening();
   if (user) checkUser(user);
 });
 
