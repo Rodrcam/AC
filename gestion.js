@@ -50,44 +50,76 @@ $("priceInput").value = PRECIO_DEFECTO;
 const weekDates = () => DAY_NAMES.map((_, i) => addDays(monday, i));
 const shortDate = (s) => fromISODate(s).toLocaleDateString("es-ES", { day: "numeric", month: "long" });
 const dayInput = (i) => $(`plato-${i}`);
+const festivoBox = (i) => $(`festivo-${i}`);
+const isFestivo = (plato) => /^festivo$/i.test(plato);
+let dirty = false; // cambios sin guardar en la semana mostrada
 
-// Una fila por día: "Lunes 12 de octubre" + campo del plato
+// Una fila por día: "Lunes 12 de octubre", el plato y la casilla de festivo
 const grid = $("weekGrid");
 DAY_NAMES.forEach((name, i) => {
-  const label = document.createElement("label");
-  label.htmlFor = `plato-${i}`;
-  label.innerHTML = `${name} <small id="date-${i}"></small>`;
-  const input = document.createElement("input");
-  input.id = `plato-${i}`;
-  input.type = "text";
-  input.placeholder = "Plato del día (o Festivo)";
-  grid.append(label, input);
+  const row = document.createElement("div");
+  row.className = "day-row";
+  row.innerHTML = `
+    <label for="plato-${i}">${name} <small id="date-${i}"></small></label>
+    <input id="plato-${i}" type="text" placeholder="Plato del día" />
+    <label class="toggle"><input id="festivo-${i}" type="checkbox" /> Festivo</label>`;
+  grid.append(row);
+  dayInput(i).addEventListener("input", () => (dirty = true));
+  festivoBox(i).addEventListener("change", () => {
+    setFestivo(i, festivoBox(i).checked);
+    dirty = true;
+  });
 });
 
+// Un día festivo se guarda con el plato "Festivo"
+function setFestivo(i, on, plato = "") {
+  festivoBox(i).checked = on;
+  dayInput(i).disabled = on;
+  dayInput(i).value = on ? "Festivo" : plato;
+  dayInput(i).closest(".day-row").classList.toggle("is-festivo", on);
+}
+
 function readWeek() {
-  return DAY_NAMES.map((_, i) => dayInput(i).value.trim());
+  return DAY_NAMES.map((_, i) => (festivoBox(i).checked ? "Festivo" : dayInput(i).value.trim()));
 }
 
 function fillWeek(platos) {
-  platos.forEach((p, i) => (dayInput(i).value = p || ""));
+  DAY_NAMES.forEach((_, i) => setFestivo(i, isFestivo(platos[i] || ""), platos[i] || ""));
+}
+
+// "12 al 16 de octubre" o, si cambia el mes, "28 de septiembre al 2 de octubre"
+function weekText(dates) {
+  const [first, last] = [fromISODate(dates[0]), fromISODate(dates[4])];
+  const from = first.getMonth() === last.getMonth() ? first.getDate() : shortDate(dates[0]);
+  return `${from} al ${shortDate(dates[4])}`;
 }
 
 // Cambia la semana mostrada; con load = true trae lo que ya hay guardado
 async function setWeek(newMonday, load = true) {
   monday = newMonday;
-  $("weekDate").value = monday;
   const dates = weekDates();
   dates.forEach((d, i) => ($(`date-${i}`).textContent = shortDate(d)));
-  $("weekLabel").textContent = `Del lunes ${shortDate(dates[0])} al viernes ${shortDate(dates[4])}`;
+  $("weekLabel").textContent = weekText(dates);
+  $("thisWeekBtn").hidden = monday === mondayOf(toISODate(new Date()));
   if (load) await loadWeek();
 }
 
-$("weekDate").addEventListener("change", () => {
-  if ($("weekDate").value) setWeek(mondayOf($("weekDate").value));
-});
+function goToWeek(newMonday) {
+  if (dirty && !confirm("Hay cambios sin guardar en esta semana. ¿Cambiar de semana igualmente?")) return;
+  setWeek(newMonday);
+}
+
+$("prevWeek").addEventListener("click", () => goToWeek(addDays(monday, -7)));
+$("nextWeek").addEventListener("click", () => goToWeek(addDays(monday, 7)));
+$("thisWeekBtn").addEventListener("click", () => goToWeek(mondayOf(toISODate(new Date()))));
+
+$("priceInput").addEventListener("input", () => (dirty = true));
 
 $("clearBtn").addEventListener("click", () => {
-  if (confirm("¿Vaciar los platos de la semana? (No se borra nada hasta que guardes)")) fillWeek([]);
+  if (confirm("¿Vaciar los platos de la semana? (No se borra nada hasta que guardes)")) {
+    fillWeek([]);
+    dirty = true;
+  }
 });
 
 // ---------- Carga y guardado en Firestore ----------
@@ -95,16 +127,24 @@ $("clearBtn").addEventListener("click", () => {
 // Los menús guardados antes del cambio a un solo plato tenían una lista "primeros"
 const platoOf = (data) => (data.plato || (data.primeros || []).join(", ")).trim();
 
+let savedDates = new Set(); // días de la semana que ya están en Firestore
+let loading = 0;            // descarta la respuesta de una semana que ya no se muestra
+
 async function loadWeek() {
+  const token = ++loading;
   $("saveMsg").textContent = "";
+  dirty = false;
   try {
-    const snaps = await Promise.all(weekDates().map((d) => getDoc(doc(db, MENUS, d))));
+    const dates = weekDates();
+    const snaps = await Promise.all(dates.map((d) => getDoc(doc(db, MENUS, d))));
+    if (token !== loading) return;
+    savedDates = new Set(dates.filter((_, i) => snaps[i].exists()));
     fillWeek(snaps.map((s) => (s.exists() ? platoOf(s.data()) : "")));
     const saved = snaps.find((s) => s.exists() && s.data().precio);
     $("priceInput").value = saved ? saved.data().precio : PRECIO_DEFECTO;
-    const n = snaps.filter((s) => s.exists()).length;
-    if (n) $("saveMsg").textContent = `Cargados ${n} días ya guardados de esta semana.`;
+    if (savedDates.size) $("saveMsg").textContent = `Cargados ${savedDates.size} días ya guardados de esta semana.`;
   } catch (e) {
+    if (token !== loading) return;
     console.error("[MENU] Error al cargar", e);
     $("saveMsg").textContent = "No se pudo cargar el menú de esta semana.";
   }
@@ -112,17 +152,19 @@ async function loadWeek() {
 
 $("saveBtn").addEventListener("click", async () => {
   const platos = readWeek();
+  const dates = weekDates();
   const precio = $("priceInput").value.trim().replace(/\s*€$/, "") || PRECIO_DEFECTO;
-  if (platos.every((p) => !p)) {
+  // Un día que estaba guardado y se ha dejado vacío se borra del menú
+  const borrar = dates.filter((d, i) => !platos[i] && savedDates.has(d));
+  if (platos.every((p) => !p) && !borrar.length) {
     $("saveMsg").textContent = "No hay ningún plato que guardar.";
     return;
   }
   $("saveBtn").disabled = true;
   $("saveMsg").textContent = "Guardando…";
   try {
-    // Todos los días de la semana en una sola escritura; los días vacíos no se tocan
+    // Todos los días de la semana en una sola escritura
     const batch = writeBatch(db);
-    const dates = weekDates();
     let n = 0;
     platos.forEach((plato, i) => {
       if (!plato) return;
@@ -135,8 +177,17 @@ $("saveBtn").addEventListener("click", async () => {
       });
       n++;
     });
+    borrar.forEach((d) => batch.delete(doc(db, MENUS, d)));
     await batch.commit();
-    $("saveMsg").textContent = `Guardados ${n} días de la semana del ${shortDate(dates[0])}.`;
+    dirty = false;
+    savedDates = new Set(dates.filter((_, i) => platos[i]));
+    const partes = [];
+    if (n) partes.push(`Guardados ${n} ${n === 1 ? "día" : "días"} de la semana del ${shortDate(dates[0])}.`);
+    if (borrar.length) {
+      const nombres = borrar.map((d) => DAY_NAMES[dates.indexOf(d)].toLowerCase());
+      partes.push(`Sin plato, se quita del menú: ${nombres.join(", ")}.`);
+    }
+    $("saveMsg").textContent = partes.join(" ");
   } catch (e) {
     console.error("[MENU] Error al guardar", e);
     $("saveMsg").textContent = e.code === "permission-denied"
@@ -289,6 +340,7 @@ $("ocrBtn").addEventListener("click", async () => {
       return;
     }
     fillWeek(platos);
+    dirty = true;
 
     const missing = DAY_NAMES.filter((_, i) => !platos[i]);
     $("ocrMsg").textContent =

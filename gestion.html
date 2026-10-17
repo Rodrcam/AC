@@ -3,15 +3,23 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Gestión del menú</title>
+    <meta name="theme-color" content="#1f1f1f" />
+    <title>AC Arise</title>
+    <link rel="icon" type="image/png" href="img/favicon.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700&family=Questrial&display=swap" />
     <link rel="stylesheet" href="styles.css" />
     <!-- OCR en el navegador (sin servidor) -->
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"></script>
   </head>
   <body>
     <header class="topbar">
-      <h1>Gestión del menú</h1>
-      <a class="link-admin" href="index.html">Ver menú</a>
+      <a class="brand" href="index.html">
+        <img src="img/arise.png" alt="ARISE" />
+        <span class="brand-text"><strong>AC Arise</strong><small>Gestión del menú</small></span>
+      </a>
+      <a class="pill-link" href="index.html">Ver menú</a>
     </header>
 
     <main class="container">
@@ -22,17 +30,21 @@
         </div>
 
         <div class="panel">
-          <label class="field">
-            <span>Semana (elige cualquier día de la semana)</span>
-            <input id="weekDate" type="date" />
-          </label>
-          <p id="weekLabel" class="week-label"></p>
+          <nav class="week-nav" aria-label="Semana">
+            <button id="prevWeek" type="button" class="icon-btn" aria-label="Semana anterior">‹</button>
+            <div class="week-title">
+              <p class="eyebrow">Semana del</p>
+              <strong id="weekLabel"></strong>
+              <button id="thisWeekBtn" type="button" class="btn-link">Esta semana</button>
+            </div>
+            <button id="nextWeek" type="button" class="icon-btn" aria-label="Semana siguiente">›</button>
+          </nav>
         </div>
 
         <div class="panel">
-          <h2>1. Foto de la hoja semanal (opcional)</h2>
-          <p class="hint">Haz una foto de la hoja del plato del día, recta y con buena luz. Se lee en tu navegador y se rellenan los cinco días. Si la hoja indica la semana, se elige sola. Revísalo antes de guardar.</p>
-          <input id="photoInput" type="file" accept="image/*" capture="environment" />
+          <h2>1. Foto de la hoja semanal</h2>
+          <p class="hint">Opcional. Haz una foto de la hoja del plato del día, recta y con buena luz. Se lee en tu navegador y se rellenan los cinco días. Si la hoja indica la semana, se elige sola. Revísalo antes de guardar.</p>
+          <input id="photoInput" class="file-input" type="file" accept="image/*" capture="environment" />
           <img id="photoPreview" class="photo-preview" alt="Vista previa de la foto" hidden />
           <button id="ocrBtn" type="button" disabled>Reconocer la semana</button>
           <progress id="ocrProgress" max="1" value="0" hidden></progress>
@@ -45,16 +57,22 @@
 
         <div class="panel">
           <h2>2. Revisa y edita</h2>
-          <div id="weekGrid" class="week-grid"></div>
+          <p class="hint">Marca «Festivo» los días que la universidad está cerrada: en el menú saldrá un aviso en lugar del plato.</p>
+          <div id="weekGrid" class="day-rows"></div>
 
           <div class="fixed-info">
-            <p><strong>Postre (siempre el mismo):</strong> <span id="postreFijo"></span></p>
-            <p>El menú incluye siempre plato del día, pan y postre.</p>
-            <label class="field price-field">
-              <span>Precio del menú</span>
-              <input id="priceInput" type="text" inputmode="decimal" />
-              <span>€</span>
-            </label>
+            <div class="extra">
+              <span class="label">Postre (siempre el mismo)</span>
+              <p id="postreFijo"></p>
+              <p class="hint">El menú incluye siempre plato del día, pan y postre.</p>
+            </div>
+            <div class="extra">
+              <label class="label" for="priceInput">Precio del menú</label>
+              <span class="price-input">
+                <input id="priceInput" type="text" inputmode="decimal" />
+                <span>€</span>
+              </span>
+            </div>
           </div>
         </div>
 
@@ -67,6 +85,11 @@
 
       <p id="loading" class="status">Comprobando sesión…</p>
     </main>
+
+    <footer class="footer">
+      <img src="img/arise.png" alt="" />
+      <span>A.R.I.S.E · Advanced Robotics Informatics Science and Engineering</span>
+    </footer>
 
     <script type="module" src="gestion.js"></script>
   </body>

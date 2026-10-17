@@ -4,11 +4,12 @@ Web estática para GitHub Pages. Todo corre en el navegador: Firebase por CDN y 
 
 ## Archivos
 
-- `index.html`, `styles.css`, `main.js`: página pública con el plato del día, el postre (siempre el mismo) y el precio del menú con pan (flechas para cambiar de día, `?fecha=AAAA-MM-DD` para enlazar uno).
+- `index.html`, `styles.css`, `main.js`: página pública con el plato del día, el postre (siempre el mismo) y el precio del menú con pan. Solo de lunes a viernes: se elige el día en la semana y las flechas cambian de semana (`?fecha=AAAA-MM-DD` enlaza un día; un sábado o domingo lleva al lunes siguiente). Un día marcado como festivo muestra el aviso "Este día es festivo y la universidad no está abierta."
 - `login.html` + `login.js`: login como el de `join.html` (Google o Microsoft, con ventana emergente), pero sin escribir en `tempusers`. Si el correo está en `canteen`, lleva a la gestión.
-- `gestion.html` + `gestion.js`: se edita la semana entera (lunes a viernes) a mano o con la foto de la hoja semanal, y se guarda de una vez. El precio viene puesto (5,10 €) y se puede cambiar. Sin sesión autorizada vuelve a `login.html`.
+- `gestion.html` + `gestion.js`: se edita la semana entera (lunes a viernes) a mano o con la foto de la hoja semanal, y se guarda de una vez. Cada día tiene una casilla "Festivo". Un día que estaba guardado y se deja vacío se quita del menú al guardar. El precio viene puesto (5,10 €) y se puede cambiar. Sin sesión autorizada vuelve a `login.html`.
 - `ocr-parser.js`: lee la hoja semanal "PLATO DEL DÍA". Saca la semana de la cabecera ("DEL 12 AL 16 DE OCTUBRE"), localiza las columnas LUNES a VIERNES y lee cada celda por separado.
 - `firebase-config.js`: la misma config pública de `arise-a3be8` que usa `join.html`, el postre fijo y el precio por defecto.
+- `img/`: logo de ARISE (de ariseclub.github.io) y favicon. Los colores y tipografías (Poppins y Questrial) son los de la web del club.
 
 La foto no se sube a ningún sitio: se procesa en el navegador y solo se guarda el texto del menú.
 

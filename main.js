@@ -1,60 +1,111 @@
-// Página pública: muestra el plato del día guardado en Firestore.
+// Página pública: muestra el plato del día guardado en Firestore, de lunes a viernes.
 // El postre y el pan son siempre los mismos; el precio se guarda con cada día.
 import { doc, getDoc } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js";
-import { db, MENUS, POSTRE, PRECIO_DEFECTO, toISODate, addDays, formatLongDate } from "./firebase-config.js";
+import {
+  db, MENUS, POSTRE, PRECIO_DEFECTO, DAY_NAMES,
+  toISODate, fromISODate, addDays, mondayOf, formatLongDate
+} from "./firebase-config.js";
 
 const $ = (id) => document.getElementById(id);
 
-// Permite enlazar un día concreto: index.html?fecha=2026-10-15
-const params = new URLSearchParams(location.search);
-let current = /^\d{4}-\d{2}-\d{2}$/.test(params.get("fecha") || "")
-  ? params.get("fecha")
-  : toISODate(new Date());
+// Sábado y domingo no abre la universidad: se pasa al lunes siguiente
+const weekdayOf = (s) => (fromISODate(s).getDay() % 6 === 0 ? mondayOf(s) : s);
+const today = () => weekdayOf(toISODate(new Date()));
 
-function shiftDay(delta) {
-  current = addDays(current, delta);
-  history.replaceState(null, "", `?fecha=${current}`);
-  loadMenu();
-}
+// Permite enlazar un día concreto: index.html?fecha=2026-10-15
+const param = new URLSearchParams(location.search).get("fecha") || "";
+let current = /^\d{4}-\d{2}-\d{2}$/.test(param) ? weekdayOf(param) : today();
+let monday = "";
+let week = {};      // fecha -> datos guardados (o null)
+let loading = 0;    // descarta respuestas de una semana que ya no se muestra
 
 // Los menús guardados antes del cambio a un solo plato tenían una lista "primeros"
-const platoOf = (data) => (data.plato || (data.primeros || []).join(", ")).trim();
+const platoOf = (data) => (data ? (data.plato || (data.primeros || []).join(", ")).trim() : "");
+const isFestivo = (plato) => /^festivo$/i.test(plato);
+const dayTitle = (s) => fromISODate(s).toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long" });
 
-async function loadMenu() {
-  $("dateLabel").textContent = formatLongDate(current);
+// Botones de los cinco días de la semana
+const chips = DAY_NAMES.map((name, i) => {
+  const b = document.createElement("button");
+  b.type = "button";
+  b.className = "day-chip";
+  b.innerHTML = `<span>${name.slice(0, 3)}</span><strong></strong>`;
+  b.addEventListener("click", () => select(addDays(monday, i)));
+  $("weekDays").append(b);
+  return b;
+});
+
+function renderChips() {
+  chips.forEach((b, i) => {
+    const date = addDays(monday, i);
+    const plato = platoOf(week[date]);
+    b.querySelector("strong").textContent = fromISODate(date).getDate();
+    b.setAttribute("aria-label", formatLongDate(date));
+    b.setAttribute("aria-pressed", String(date === current));
+    b.classList.toggle("is-selected", date === current);
+    b.classList.toggle("is-today", date === toISODate(new Date()));
+    b.classList.toggle("is-festivo", isFestivo(plato));
+    b.classList.toggle("has-menu", !!plato && !isFestivo(plato));
+  });
+}
+
+function renderDay() {
+  $("dateLabel").textContent = dayTitle(current);
+  const data = week[current];
+  const plato = platoOf(data);
+  const festivo = isFestivo(plato);
+
+  $("status").hidden = !!plato;
+  $("status").textContent = "Todavía no hay menú publicado para este día.";
+  $("festivo").hidden = !festivo;
+  $("menu").hidden = !plato || festivo;
+  if (plato && !festivo) {
+    $("plato").textContent = plato;
+    $("postre").textContent = POSTRE;
+    $("price").textContent = `${data.precio || PRECIO_DEFECTO} €`;
+  }
+}
+
+async function loadWeek() {
+  const token = ++loading;
+  week = {};
+  renderChips();
+  $("dateLabel").textContent = dayTitle(current);
   $("status").hidden = false;
   $("status").textContent = "Cargando menú…";
   $("menu").hidden = true;
+  $("festivo").hidden = true;
 
   try {
-    const snap = await getDoc(doc(db, MENUS, current));
-    const plato = snap.exists() ? platoOf(snap.data()) : "";
-    if (!plato) {
-      $("status").textContent = "Todavía no hay menú publicado para este día.";
-      return;
-    }
-
-    const festivo = /^festivo$/i.test(plato);
-    $("plato").textContent = plato;
-    $("postre").textContent = POSTRE;
-    $("postreCard").hidden = festivo;
-    $("price").hidden = festivo;
-    $("price").textContent = `Plato del día, pan y postre: ${snap.data().precio || PRECIO_DEFECTO} €`;
-
-    $("status").hidden = true;
-    $("menu").hidden = false;
+    const dates = DAY_NAMES.map((_, i) => addDays(monday, i));
+    const snaps = await Promise.all(dates.map((d) => getDoc(doc(db, MENUS, d))));
+    if (token !== loading) return;
+    dates.forEach((d, i) => (week[d] = snaps[i].exists() ? snaps[i].data() : null));
+    renderChips();
+    renderDay();
   } catch (e) {
+    if (token !== loading) return;
     console.error("[MENU] Error al cargar", e);
     $("status").textContent = "No se pudo cargar el menú. Inténtalo de nuevo más tarde.";
   }
 }
 
-$("prevDay").addEventListener("click", () => shiftDay(-1));
-$("nextDay").addEventListener("click", () => shiftDay(1));
-$("todayBtn").addEventListener("click", () => {
-  current = toISODate(new Date());
-  history.replaceState(null, "", location.pathname);
-  loadMenu();
-});
+function select(date) {
+  current = date;
+  history.replaceState(null, "", date === today() ? location.pathname : `?fecha=${date}`);
+  const newMonday = mondayOf(date);
+  if (newMonday !== monday) {
+    monday = newMonday;
+    loadWeek();
+  } else {
+    renderChips();
+    renderDay();
+  }
+}
 
-loadMenu();
+// Al cambiar de semana se queda el mismo día de la semana
+$("prevWeek").addEventListener("click", () => select(addDays(current, -7)));
+$("nextWeek").addEventListener("click", () => select(addDays(current, 7)));
+$("todayBtn").addEventListener("click", () => select(today()));
+
+select(current);
