@@ -2,7 +2,8 @@
 <html lang="es">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="robots" content="noindex, nofollow" />
     <meta name="theme-color" content="#1f1f1f" />
     <title>AC Arise</title>
     <link rel="icon" type="image/png" href="img/favicon.png" />
@@ -76,11 +77,13 @@
           </div>
         </div>
 
-        <div class="actions">
-          <button id="clearBtn" type="button" class="btn-secondary">Vaciar</button>
-          <button id="saveBtn" type="button">Guardar semana</button>
+        <div class="savebar">
+          <div class="actions">
+            <button id="clearBtn" type="button" class="btn-secondary">Vaciar</button>
+            <button id="saveBtn" type="button">Guardar semana</button>
+          </div>
+          <p id="saveMsg" class="msg"></p>
         </div>
-        <p id="saveMsg" class="msg"></p>
       </section>
 
       <p id="loading" class="status">Comprobando sesión…</p>
